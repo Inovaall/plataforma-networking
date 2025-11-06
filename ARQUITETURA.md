@@ -2540,15 +2540,6 @@ gunzip -c backup_20250105_120000.sql.gz | psql -U $DB_USER -h $DB_HOST -d $DB_NA
 
 ---
 
-## 📞 Contato e Suporte
-
-**Desenvolvido por:** [Seu Nome]  
-**Email:** seu.email@example.com  
-**LinkedIn:** [linkedin.com/in/seu-perfil](https://linkedin.com/in/seu-perfil)  
-**GitHub:** [github.com/seu-usuario](https://github.com/seu-usuario)
-
----
-
 ## 📄 Licença
 
 Este projeto foi desenvolvido como parte de um processo seletivo e é fornecido "como está", sem garantias.
