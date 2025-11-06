@@ -1,8 +1,6 @@
 # 📐 Arquitetura da Plataforma de Networking e Geração de Negócios
 
-Este documento descreve a arquitetura planejada para a plataforma de gestão
-de grupos de networking, com foco em geração de negócios, engajamento,
-controle financeiro e análises de performance.
+Este documento descreve a arquitetura planejada para a plataforma de gestão de grupos de networking, com foco em geração de negócios, engajamento, controle financeiro e análises de performance.
 
 ---
 
@@ -27,8 +25,7 @@ flowchart TD
     API --> DB[(PostgreSQL via Prisma ORM)]
     Client --> Auth[JWT Auth / Roles RBAC]
     AdminPanel[Admin Interface] --> API
-Tecnologias principais:
-
+Tecnologias principais
 Next.js + React + TypeScript
 
 PostgreSQL
@@ -54,88 +51,87 @@ Testes	Jest + RTL + Supertest
 mermaid
 Copiar código
 erDiagram
+    USER {
+      uuid id PK
+      string name
+      string email
+      string passwordHash
+      string role
+      string status
+      datetime createdAt
+    }
 
-USER {
-  uuid id PK
-  string name
-  string email
-  string passwordHash
-  string role "admin/member"
-  string status "pending/active/rejected"
-  datetime createdAt
-}
+    APPLICATION {
+      uuid id PK
+      string name
+      string email
+      string phone
+      string company
+      string status
+      datetime createdAt
+    }
 
-APPLICATION {
-  uuid id PK
-  string name
-  string email
-  string phone
-  string company
-  string status "pending/approved/rejected"
-  datetime createdAt
-}
+    INVITE {
+      uuid id PK
+      uuid userId FK
+      string token
+      datetime expiresAt
+    }
 
-INVITE {
-  uuid id PK
-  uuid userId FK
-  string token
-  datetime expiresAt
-}
+    ANNOUNCEMENT {
+      uuid id PK
+      uuid createdBy FK
+      string title
+      string message
+      datetime createdAt
+    }
 
-ANNOUNCEMENT {
-  uuid id PK
-  uuid createdBy FK
-  string title
-  string message
-  datetime createdAt
-}
+    MEETING {
+      uuid id PK
+      datetime date
+      string type
+    }
 
-MEETING {
-  uuid id PK
-  datetime date
-  string type "weekly/event"
-}
+    CHECKIN {
+      uuid id PK
+      uuid userId FK
+      uuid meetingId FK
+      datetime createdAt
+    }
 
-CHECKIN {
-  uuid id PK
-  uuid userId FK
-  uuid meetingId FK
-  datetime createdAt
-}
+    REFERRAL {
+      uuid id PK
+      uuid fromUserId FK
+      uuid toUserId FK
+      string description
+      string status
+      datetime createdAt
+    }
 
-REFERRAL {
-  uuid id PK
-  uuid fromUserId FK
-  uuid toUserId FK
-  string description
-  string status "sent/in_progress/closed"
-  datetime createdAt
-}
+    THANKYOU {
+      uuid id PK
+      uuid referralId FK
+      uuid fromUserId FK
+      uuid toUserId FK
+      string message
+      datetime createdAt
+    }
 
-THANKYOU {
-  uuid id PK
-  uuid referralId FK
-  uuid fromUserId FK
-  uuid toUserId FK
-  string message
-  datetime createdAt
-}
+    ONEONONE {
+      uuid id PK
+      uuid userA FK
+      uuid userB FK
+      datetime date
+    }
 
-ONEONONE {
-  uuid id PK
-  uuid userA FK
-  uuid userB FK
-  datetime date
-}
-
-FEE {
-  uuid id PK
-  uuid userId FK
-  decimal amount
-  string status "pending/paid"
-  datetime dueDate
-  datetime paidAt
-}
+    FEE {
+      uuid id PK
+      uuid userId FK
+      decimal amount
+      string status
+      datetime dueDate
+      datetime paidAt
+    }
 Justificativa do PostgreSQL
 
 Relacionamentos complexos (muitos-para-muitos)
@@ -145,8 +141,6 @@ Consistência e auditoria
 Escalável e compatível com Prisma e serviços cloud
 
 🧩 Estrutura do Frontend (Next.js)
-Padrão de organização:
-
 swift
 Copiar código
 src/
@@ -155,7 +149,7 @@ src/
  │   ├─ dashboard/
  │   ├─ admin/
  ├─ components/
- │   ├─ ui/ (botões, inputs, cards)
+ │   ├─ ui/
  │   ├─ features/
  │   │   ├─ applications/
  │   │   ├─ referrals/
@@ -166,14 +160,14 @@ src/
  ├─ hooks/
  ├─ tests/
  └─ prisma/
-Estado Global:
+Estado Global
 
 Auth e User context
 
 SWR ou React Query para dados
 
 🌐 API — Endpoints Principais
-1) Enviar intenção de participação
+1️⃣ Enviar intenção de participação
 POST /api/applications
 
 Request:
@@ -191,7 +185,7 @@ Response:
 json
 Copiar código
 { "message": "Candidatura enviada com sucesso" }
-2) Admin listar aplicações
+2️⃣ Admin listar aplicações
 GET /api/admin/applications
 
 Response:
@@ -201,7 +195,7 @@ Copiar código
 [
   { "id": "uuid", "name": "Tiago", "email": "tiago@email.com", "status": "pending" }
 ]
-3) Criar indicação
+3️⃣ Criar indicação
 POST /api/referrals
 
 Request:
@@ -217,9 +211,7 @@ Response:
 json
 Copiar código
 { "id": "uuid", "status": "sent" }
-📊 Dashboard
-Métricas:
-
+📊 Dashboard — Métricas
 Indicações feitas vs recebidas
 
 Taxa de conversão
