@@ -2,7 +2,7 @@
 
 > **Versão:** 1.0  
 > **Autor:** Tiago Barbosa Soares  
-> **Data:05** Novembro 2025
+> **Data: 05** Novembro 2025
 
 ---
 
