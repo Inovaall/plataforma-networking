@@ -65,7 +65,7 @@ Plataforma web que substitui planilhas e controles manuais, oferecendo gestão c
 
 ### **1. Clonar o Repositório**
 ```bash
-git clone <url-do-repositorio>
+git clone https://github.com/Inovaall/plataforma-networking.git
 cd plataforma-networking
 ```
 
