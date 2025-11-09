@@ -1,11 +1,10 @@
+// src/app/api/applications/[id]/reject/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { applicationService } from '@/services/applicationService';
 import { rejectApplicationSchema } from '@/lib/validations';
 import { isAdmin } from '@/lib/auth';
 import type { ApiResponse } from '@/types/api';
-import type { Application } from '@prisma/client';
 
-// POST /api/applications/:id/reject - Rejeitar candidatura (admin)
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -23,22 +22,29 @@ export async function POST(
       };
       return NextResponse.json(response, { status: 401 });
     }
-    
+
     const body = await request.json();
+    
+    // Validar dados
     const validatedData = rejectApplicationSchema.parse(body);
     
+    // Rejeitar candidatura
     const application = await applicationService.reject(
       params.id,
       validatedData.reviewedBy
     );
     
-    const response: ApiResponse<Application> = {
+    const response: ApiResponse = {
       success: true,
-      data: application,
+      data: {
+        id: application.id,
+        status: application.status,
+        reviewedAt: application.reviewedAt,
+      },
       message: 'Candidatura rejeitada.',
     };
     
-    return NextResponse.json(response);
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     if (error instanceof Error) {
       const response: ApiResponse = {

@@ -1,19 +1,25 @@
+// src/services/memberService.ts
 import { prisma } from '@/lib/prisma';
 import { verifyInviteToken } from '@/lib/auth';
 import type { MemberInput } from '@/lib/validations';
+import type { Member } from '@prisma/client';
 
-export const memberService = {
-  // Criar membro a partir de token de convite
-  async createFromInvite(data: MemberInput) {
-    // Verificar token
-    const decoded = verifyInviteToken(data.inviteToken);
+class MemberService {
+  /**
+   * Criar membro a partir de candidatura aprovada
+   */
+  async create(data: MemberInput): Promise<Member> {
+    const { inviteToken, phone, position, bio, expertise } = data;
+
+    // Validar token
+    const decoded = verifyInviteToken(inviteToken);
     if (!decoded) {
-      throw new Error('Token inválido ou expirado');
+      throw new Error('Token de convite inválido ou expirado');
     }
 
-    // Buscar application
+    // Buscar candidatura
     const application = await prisma.application.findUnique({
-      where: { id: decoded.applicationId },
+      where: { inviteToken },
     });
 
     if (!application) {
@@ -21,20 +27,17 @@ export const memberService = {
     }
 
     if (application.status !== 'APPROVED') {
-      throw new Error('Candidatura não foi aprovada');
+      throw new Error('Candidatura não está aprovada');
     }
 
-    if (application.inviteToken !== data.inviteToken) {
-      throw new Error('Token inválido');
-    }
-
+    // Verificar se token expirou
     if (application.inviteTokenExpiry && application.inviteTokenExpiry < new Date()) {
-      throw new Error('Token expirado');
+      throw new Error('Token de convite expirado');
     }
 
-    // Verificar se já existe membro
+    // Verificar se membro já existe
     const existingMember = await prisma.member.findUnique({
-      where: { applicationId: application.id },
+      where: { email: application.email },
     });
 
     if (existingMember) {
@@ -48,30 +51,51 @@ export const memberService = {
         name: application.name,
         email: application.email,
         company: application.company,
-        phone: data.phone,
-        position: data.position,
-        bio: data.bio,
-        expertise: data.expertise,
+        phone: phone || null,
+        position: position || null,
+        bio: bio || null,
+        expertise,
         status: 'ACTIVE',
       },
     });
-  },
+  }
 
-  // Listar membros ativos
-  async list() {
+  /**
+   * Listar membros ativos
+   */
+  async list(): Promise<Member[]> {
     return prisma.member.findMany({
       where: { status: 'ACTIVE' },
       orderBy: { joinedAt: 'desc' },
     });
-  },
+  }
 
-  // Buscar por ID
-  async findById(id: string) {
+  /**
+   * Buscar membro por ID
+   */
+  async findById(id: string): Promise<Member | null> {
     return prisma.member.findUnique({
       where: { id },
-      include: {
-        application: true,
-      },
     });
-  },
-};
+  }
+
+  /**
+   * Buscar membro por email
+   */
+  async findByEmail(email: string): Promise<Member | null> {
+    return prisma.member.findUnique({
+      where: { email },
+    });
+  }
+
+  /**
+   * Contar total de membros ativos
+   */
+  async countActive(): Promise<number> {
+    return prisma.member.count({
+      where: { status: 'ACTIVE' },
+    });
+  }
+}
+
+export const memberService = new MemberService();

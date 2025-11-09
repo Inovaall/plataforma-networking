@@ -1,10 +1,9 @@
+// src/app/api/applications/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { applicationService } from '@/services/applicationService';
 import { isAdmin } from '@/lib/auth';
 import type { ApiResponse } from '@/types/api';
-import type { Application } from '@prisma/client';
 
-// GET /api/applications/:id - Buscar candidatura (admin)
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -22,7 +21,8 @@ export async function GET(
       };
       return NextResponse.json(response, { status: 401 });
     }
-    
+
+    // Buscar candidatura
     const application = await applicationService.findById(params.id);
     
     if (!application) {
@@ -36,7 +36,7 @@ export async function GET(
       return NextResponse.json(response, { status: 404 });
     }
     
-    const response: ApiResponse<Application> = {
+    const response: ApiResponse = {
       success: true,
       data: application,
     };

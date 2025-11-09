@@ -1,9 +1,9 @@
+// src/app/api/dashboard/stats/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { dashboardService } from '@/services/dashboardService';
 import { isAdmin } from '@/lib/auth';
 import type { ApiResponse } from '@/types/api';
 
-// GET /api/dashboard/stats
 export async function GET(request: NextRequest) {
   try {
     // Verificar autenticação admin
@@ -19,21 +19,27 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(response, { status: 401 });
     }
 
-    // Buscar estatísticas
+    // Obter estatísticas
     const stats = await dashboardService.getStats();
-
-    const response: ApiResponse<typeof stats> = {
+    
+    // Obter top performers
+    const topPerformers = await dashboardService.getTopReferrers(5);
+    
+    const response: ApiResponse = {
       success: true,
-      data: stats,
+      data: {
+        ...stats,
+        topPerformers,
+      },
     };
-
+    
     return NextResponse.json(response);
   } catch (error) {
     const response: ApiResponse = {
       success: false,
       error: {
         code: 'INTERNAL_ERROR',
-        message: 'Erro ao buscar estatísticas',
+        message: 'Erro ao obter estatísticas',
       },
     };
     return NextResponse.json(response, { status: 500 });

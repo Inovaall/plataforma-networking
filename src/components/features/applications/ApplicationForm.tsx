@@ -1,3 +1,4 @@
+// src/components/features/applications/ApplicationForm.tsx
 'use client';
 
 import { useState } from 'react';
@@ -6,27 +7,27 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { applicationSchema, type ApplicationInput } from '@/lib/validations';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useRouter } from 'next/navigation';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 export function ApplicationForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const router = useRouter();
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
+    reset,
   } = useForm<ApplicationInput>({
     resolver: zodResolver(applicationSchema),
   });
 
   const onSubmit = async (data: ApplicationInput) => {
     setIsSubmitting(true);
-    setError(null);
+    setErrorMessage(null);
 
     try {
       const response = await fetch('/api/applications', {
@@ -41,94 +42,98 @@ export function ApplicationForm() {
         throw new Error(result.error?.message || 'Erro ao enviar candidatura');
       }
 
-      setSuccess(true);
-      setTimeout(() => router.push('/'), 2000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao enviar candidatura');
+      setSubmitSuccess(true);
+      reset();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Erro ao enviar candidatura');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (success) {
+  if (submitSuccess) {
     return (
-      <div className="text-center py-8">
-        <div className="mb-4 text-6xl">✅</div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Candidatura enviada com sucesso!
-        </h2>
-        <p className="text-gray-600">
-          Você receberá um email quando sua candidatura for avaliada.
-        </p>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-green-600">✅ Candidatura Enviada!</CardTitle>
+          <CardDescription>
+            Sua candidatura foi enviada com sucesso. Em breve você receberá um retorno da nossa equipe.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button onClick={() => setSubmitSuccess(false)} variant="outline">
+            Enviar Nova Candidatura
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-          {error}
+      {errorMessage && (
+        <div className="rounded-md bg-red-50 p-4 text-sm text-red-800">
+          {errorMessage}
         </div>
       )}
 
-      <div>
-        <Label htmlFor="name">Nome completo *</Label>
+      <div className="space-y-2">
+        <Label htmlFor="name">Nome Completo *</Label>
         <Input
           id="name"
           {...register('name')}
-          placeholder="João Silva"
-          className="mt-1"
+          placeholder="Seu nome completo"
+          disabled={isSubmitting}
         />
         {errors.name && (
-          <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+          <p className="text-sm text-red-600">{errors.name.message}</p>
         )}
       </div>
 
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="email">Email *</Label>
         <Input
           id="email"
           type="email"
           {...register('email')}
-          placeholder="joao@empresa.com"
-          className="mt-1"
+          placeholder="seu@email.com"
+          disabled={isSubmitting}
         />
         {errors.email && (
-          <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>
+          <p className="text-sm text-red-600">{errors.email.message}</p>
         )}
       </div>
 
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="company">Empresa *</Label>
         <Input
           id="company"
           {...register('company')}
-          placeholder="Tech Solutions Ltda"
-          className="mt-1"
+          placeholder="Nome da sua empresa"
+          disabled={isSubmitting}
         />
         {errors.company && (
-          <p className="mt-1 text-sm text-red-600">{errors.company.message}</p>
+          <p className="text-sm text-red-600">{errors.company.message}</p>
         )}
       </div>
 
-      <div>
+      <div className="space-y-2">
         <Label htmlFor="motivation">Por que você quer participar? *</Label>
         <Textarea
           id="motivation"
           {...register('motivation')}
-          placeholder="Explique sua motivação para participar do grupo... (mínimo 50 caracteres)"
+          placeholder="Conte-nos sobre suas motivações e o que você espera do grupo (mínimo 50 caracteres)"
           rows={5}
-          className="mt-1"
+          disabled={isSubmitting}
         />
         {errors.motivation && (
-          <p className="mt-1 text-sm text-red-600">{errors.motivation.message}</p>
+          <p className="text-sm text-red-600">{errors.motivation.message}</p>
         )}
-        <p className="mt-1 text-sm text-gray-500">Mínimo 50 caracteres</p>
+        <p className="text-xs text-gray-500">Mínimo 50 caracteres</p>
       </div>
 
       <Button type="submit" className="w-full" disabled={isSubmitting}>
-        {isSubmitting ? 'Enviando...' : 'Enviar candidatura'}
+        {isSubmitting ? 'Enviando...' : 'Enviar Candidatura'}
       </Button>
     </form>
   );

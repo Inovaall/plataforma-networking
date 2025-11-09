@@ -1,11 +1,15 @@
+// src/services/applicationService.ts
 import { prisma } from '@/lib/prisma';
-import { generateInviteToken } from '@/lib/auth';
-import type { ApplicationInput } from '@/lib/validations';
-import type { ApplicationStatus } from '@prisma/client';
+import { generateInviteToken, getInviteTokenExpiry } from '@/lib/auth';
+import type { ApplicationInput, ApplicationQuery } from '@/lib/validations';
+import type { Application, ApplicationStatus } from '@prisma/client';
+import type { PaginatedResponse } from '@/types/api';
 
-export const applicationService = {
-  // Criar nova candidatura
-  async create(data: ApplicationInput) {
+class ApplicationService {
+  /**
+   * Criar nova candidatura
+   */
+  async create(data: ApplicationInput): Promise<Application> {
     // Verificar se email já existe
     const existing = await prisma.application.findUnique({
       where: { email: data.email },
@@ -17,29 +21,33 @@ export const applicationService = {
 
     return prisma.application.create({
       data: {
-        ...data,
+        name: data.name,
+        email: data.email,
+        company: data.company,
+        motivation: data.motivation,
         status: 'PENDING',
       },
     });
-  },
+  }
 
-  // Listar candidaturas com filtro e paginação
-  async list(filters: {
-    status?: ApplicationStatus;
-    page: number;
-    limit: number;
-  }) {
-    const { status, page, limit } = filters;
+  /**
+   * Listar candidaturas com filtros e paginação
+   */
+  async list(query: ApplicationQuery): Promise<PaginatedResponse<Application>> {
+    const { status, page = 1, limit = 20 } = query;
     const skip = (page - 1) * limit;
 
-    const where = status ? { status } : {};
+    const where: { status?: ApplicationStatus } = {};
+    if (status) {
+      where.status = status;
+    }
 
     const [items, total] = await Promise.all([
       prisma.application.findMany({
         where,
+        orderBy: { submittedAt: 'desc' },
         skip,
         take: limit,
-        orderBy: { submittedAt: 'desc' },
       }),
       prisma.application.count({ where }),
     ]);
@@ -53,17 +61,21 @@ export const applicationService = {
         totalPages: Math.ceil(total / limit),
       },
     };
-  },
+  }
 
-  // Buscar por ID
-  async findById(id: string) {
+  /**
+   * Buscar candidatura por ID
+   */
+  async findById(id: string): Promise<Application | null> {
     return prisma.application.findUnique({
       where: { id },
     });
-  },
+  }
 
-  // Aprovar candidatura
-  async approve(id: string, reviewedBy: string) {
+  /**
+   * Aprovar candidatura e gerar token de convite
+   */
+  async approve(id: string, reviewedBy: string): Promise<Application> {
     const application = await prisma.application.findUnique({
       where: { id },
     });
@@ -73,12 +85,12 @@ export const applicationService = {
     }
 
     if (application.status !== 'PENDING') {
-      throw new Error('Candidatura já foi processada');
+      throw new Error('Candidatura já foi revisada');
     }
 
-    // Gerar token de convite
+    // Gerar token único
     const inviteToken = generateInviteToken(application.id, application.email);
-    const inviteTokenExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
+    const inviteTokenExpiry = getInviteTokenExpiry();
 
     return prisma.application.update({
       where: { id },
@@ -90,10 +102,12 @@ export const applicationService = {
         inviteTokenExpiry,
       },
     });
-  },
+  }
 
-  // Rejeitar candidatura
-  async reject(id: string, reviewedBy: string) {
+  /**
+   * Rejeitar candidatura
+   */
+  async reject(id: string, reviewedBy: string): Promise<Application> {
     const application = await prisma.application.findUnique({
       where: { id },
     });
@@ -103,7 +117,7 @@ export const applicationService = {
     }
 
     if (application.status !== 'PENDING') {
-      throw new Error('Candidatura já foi processada');
+      throw new Error('Candidatura já foi revisada');
     }
 
     return prisma.application.update({
@@ -114,5 +128,16 @@ export const applicationService = {
         reviewedAt: new Date(),
       },
     });
-  },
-};
+  }
+
+  /**
+   * Buscar candidatura por token de convite
+   */
+  async findByInviteToken(token: string): Promise<Application | null> {
+    return prisma.application.findUnique({
+      where: { inviteToken: token },
+    });
+  }
+}
+
+export const applicationService = new ApplicationService();

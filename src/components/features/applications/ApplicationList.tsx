@@ -1,218 +1,130 @@
+// src/components/features/applications/ApplicationList.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
+import type { Application } from '@prisma/client';
+import { ApplicationCard } from './ApplicationCard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatDateTime } from '@/lib/utils';
-import type { Application } from '@prisma/client';
 
-const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || 'admin_token';
+type FilterStatus = 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export function ApplicationList() {
   const [applications, setApplications] = useState<Application[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED'>('all');
-  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterStatus>('ALL');
+
+  const fetchApplications = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const url = filter === 'ALL' 
+        ? '/api/applications'
+        : `/api/applications?status=${filter}`;
+
+      const response = await fetch(url, {
+        headers: {
+          'X-Admin-Token': process.env.NEXT_PUBLIC_ADMIN_TOKEN || 'admin_super_secret_token_change_me_in_production',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao carregar candidaturas');
+      }
+
+      const result = await response.json();
+      setApplications(result.data.items);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar candidaturas');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchApplications();
   }, [filter]);
 
-  const fetchApplications = async () => {
-    try {
-      const url = filter === 'all' 
-        ? '/api/applications'
-        : `/api/applications?status=${filter}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          'X-Admin-Token': ADMIN_TOKEN,
-        },
-      });
-
-      const result = await response.json();
-      
-      if (result.success) {
-        setApplications(result.data.items || []);
-      }
-    } catch (error) {
-      console.error('Erro ao carregar candidaturas:', error);
-    } finally {
-      setLoading(false);
-    }
+  const handleStatusChange = () => {
+    fetchApplications();
   };
 
-  const handleApprove = async (id: string) => {
-    setProcessingId(id);
-    try {
-      const response = await fetch(`/api/applications/${id}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Token': ADMIN_TOKEN,
-        },
-        body: JSON.stringify({ reviewedBy: 'Admin' }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert(`✅ Candidatura aprovada!\n\nLink de convite:\n${result.data.inviteLink}`);
-        fetchApplications();
-      } else {
-        alert(`❌ Erro: ${result.error?.message}`);
-      }
-    } catch (error) {
-      alert('❌ Erro ao aprovar candidatura');
-    } finally {
-      setProcessingId(null);
-    }
+  const counts = {
+    ALL: applications.length,
+    PENDING: applications.filter(a => a.status === 'PENDING').length,
+    APPROVED: applications.filter(a => a.status === 'APPROVED').length,
+    REJECTED: applications.filter(a => a.status === 'REJECTED').length,
   };
 
-  const handleReject = async (id: string) => {
-    if (!confirm('Tem certeza que deseja rejeitar esta candidatura?')) {
-      return;
-    }
-
-    setProcessingId(id);
-    try {
-      const response = await fetch(`/api/applications/${id}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Admin-Token': ADMIN_TOKEN,
-        },
-        body: JSON.stringify({ reviewedBy: 'Admin' }),
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert('✅ Candidatura rejeitada');
-        fetchApplications();
-      } else {
-        alert(`❌ Erro: ${result.error?.message}`);
-      }
-    } catch (error) {
-      alert('❌ Erro ao rejeitar candidatura');
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants = {
-      PENDING: 'bg-yellow-100 text-yellow-800',
-      APPROVED: 'bg-green-100 text-green-800',
-      REJECTED: 'bg-red-100 text-red-800',
-    };
-    
-    const labels = {
-      PENDING: 'Pendente',
-      APPROVED: 'Aprovado',
-      REJECTED: 'Rejeitado',
-    };
-
+  if (error) {
     return (
-      <Badge className={variants[status as keyof typeof variants]}>
-        {labels[status as keyof typeof labels]}
-      </Badge>
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p className="text-red-800">{error}</p>
+        <Button onClick={fetchApplications} variant="outline" className="mt-2">
+          Tentar Novamente
+        </Button>
+      </div>
     );
-  };
-
-  if (loading) {
-    return <div className="text-center py-8">Carregando...</div>;
   }
 
   return (
     <div className="space-y-6">
       {/* Filtros */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button
-          variant={filter === 'all' ? 'default' : 'outline'}
-          onClick={() => setFilter('all')}
+          variant={filter === 'ALL' ? 'default' : 'outline'}
+          onClick={() => setFilter('ALL')}
+          size="sm"
         >
-          Todas
+          Todas <Badge variant="secondary" className="ml-2">{counts.ALL}</Badge>
         </Button>
         <Button
           variant={filter === 'PENDING' ? 'default' : 'outline'}
           onClick={() => setFilter('PENDING')}
+          size="sm"
         >
-          Pendentes
+          Pendentes <Badge variant="warning" className="ml-2">{counts.PENDING}</Badge>
         </Button>
         <Button
           variant={filter === 'APPROVED' ? 'default' : 'outline'}
           onClick={() => setFilter('APPROVED')}
+          size="sm"
         >
-          Aprovadas
+          Aprovadas <Badge variant="success" className="ml-2">{counts.APPROVED}</Badge>
         </Button>
         <Button
           variant={filter === 'REJECTED' ? 'default' : 'outline'}
           onClick={() => setFilter('REJECTED')}
+          size="sm"
         >
-          Rejeitadas
+          Rejeitadas <Badge variant="destructive" className="ml-2">{counts.REJECTED}</Badge>
         </Button>
       </div>
 
+      {/* Loading */}
+      {isLoading && (
+        <div className="text-center py-8">
+          <p className="text-gray-600">Carregando candidaturas...</p>
+        </div>
+      )}
+
       {/* Lista */}
-      {applications.length === 0 ? (
-        <Card>
-          <CardContent className="py-8 text-center text-gray-500">
-            Nenhuma candidatura encontrada
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-4">
-          {applications.map((app) => (
-            <Card key={app.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-xl">{app.name}</CardTitle>
-                    <p className="text-sm text-gray-500 mt-1">{app.email}</p>
-                  </div>
-                  {getStatusBadge(app.status)}
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Empresa:</p>
-                  <p className="text-sm text-gray-600">{app.company}</p>
-                </div>
+      {!isLoading && applications.length === 0 && (
+        <div className="text-center py-8 text-gray-600">
+          Nenhuma candidatura encontrada.
+        </div>
+      )}
 
-                <div>
-                  <p className="text-sm font-medium text-gray-700">Motivação:</p>
-                  <p className="text-sm text-gray-600">{app.motivation}</p>
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t">
-                  <p className="text-xs text-gray-500">
-                    Enviado em {formatDateTime(app.submittedAt)}
-                  </p>
-
-                  {app.status === 'PENDING' && (
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleReject(app.id)}
-                        disabled={processingId === app.id}
-                      >
-                        Rejeitar
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleApprove(app.id)}
-                        disabled={processingId === app.id}
-                      >
-                        {processingId === app.id ? 'Processando...' : 'Aprovar'}
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+      {!isLoading && applications.length > 0 && (
+        <div className="grid gap-4">
+          {applications.map(application => (
+            <ApplicationCard
+              key={application.id}
+              application={application}
+              onStatusChange={handleStatusChange}
+            />
           ))}
         </div>
       )}

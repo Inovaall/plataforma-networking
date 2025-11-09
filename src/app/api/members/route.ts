@@ -1,10 +1,11 @@
+// src/app/api/members/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { memberService } from '@/services/memberService';
 import { memberSchema } from '@/lib/validations';
 import type { ApiResponse } from '@/types/api';
 import type { Member } from '@prisma/client';
 
-// POST /api/members - Cadastro completo com token
+// POST /api/members - Criar membro com token de convite
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
     const validatedData = memberSchema.parse(body);
     
     // Criar membro
-    const member = await memberService.createFromInvite(validatedData);
+    const member = await memberService.create(validatedData);
     
     const response: ApiResponse<Member> = {
       success: true,
@@ -38,15 +39,15 @@ export async function POST(request: NextRequest) {
       success: false,
       error: {
         code: 'INTERNAL_ERROR',
-        message: 'Erro ao completar cadastro',
+        message: 'Erro ao criar membro',
       },
     };
     return NextResponse.json(response, { status: 500 });
   }
 }
 
-// GET /api/members - Listar membros
-export async function GET() {
+// GET /api/members - Listar membros ativos
+export async function GET(request: NextRequest) {
   try {
     const members = await memberService.list();
     

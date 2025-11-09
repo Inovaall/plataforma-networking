@@ -1,11 +1,10 @@
+// src/app/api/applications/[id]/approve/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { applicationService } from '@/services/applicationService';
 import { approveApplicationSchema } from '@/lib/validations';
 import { isAdmin } from '@/lib/auth';
 import type { ApiResponse } from '@/types/api';
-import type { Application } from '@prisma/client';
 
-// POST /api/applications/:id/approve - Aprovar candidatura (admin)
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -23,34 +22,31 @@ export async function POST(
       };
       return NextResponse.json(response, { status: 401 });
     }
-    
+
     const body = await request.json();
+    
+    // Validar dados
     const validatedData = approveApplicationSchema.parse(body);
     
+    // Aprovar candidatura
     const application = await applicationService.approve(
       params.id,
       validatedData.reviewedBy
     );
     
-    // Gerar link de convite
-    const inviteLink = `${process.env.NEXT_PUBLIC_APP_URL}/cadastro/${application.inviteToken}`;
-    
-    // Simular envio de email (log)
-    console.log('📧 Email de aprovação:');
-    console.log(`   Para: ${application.email}`);
-    console.log(`   Link: ${inviteLink}`);
-    console.log(`   Expira em: ${application.inviteTokenExpiry}`);
-    
-    const response: ApiResponse<Application & { inviteLink: string }> = {
+    const response: ApiResponse = {
       success: true,
       data: {
-        ...application,
-        inviteLink,
+        id: application.id,
+        status: application.status,
+        inviteToken: application.inviteToken,
+        inviteLink: `${request.nextUrl.origin}/cadastro/${application.inviteToken}`,
+        inviteTokenExpiry: application.inviteTokenExpiry,
       },
       message: 'Candidatura aprovada! Link de convite gerado.',
     };
     
-    return NextResponse.json(response);
+    return NextResponse.json(response, { status: 200 });
   } catch (error) {
     if (error instanceof Error) {
       const response: ApiResponse = {

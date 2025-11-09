@@ -1,108 +1,118 @@
+// src/services/dashboardService.ts
 import { prisma } from '@/lib/prisma';
 
-export const dashboardService = {
-  // Buscar estatísticas gerais
-  async getStats(startDate?: Date, endDate?: Date) {
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+interface DashboardStats {
+  members: {
+    total: number;
+    active: number;
+    inactive: number;
+  };
+  applications: {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
+  };
+  referrals: {
+    total: number;
+    sent: number;
+    inNegotiation: number;
+    closed: number;
+    declined: number;
+  };
+  thanks: {
+    total: number;
+  };
+}
 
-    const start = startDate || firstDayOfMonth;
-    const end = endDate || lastDayOfMonth;
-
-    // Membros ativos
-    const totalMembers = await prisma.member.count({
-      where: { status: 'ACTIVE' },
-    });
-
-    // Indicações no período
-    const referralsInPeriod = await prisma.referral.count({
-      where: {
-        createdAt: {
-          gte: start,
-          lte: end,
-        },
-      },
-    });
-
-    // Indicações por status
-    const referralsByStatus = await prisma.referral.groupBy({
-      by: ['status'],
-      where: {
-        createdAt: {
-          gte: start,
-          lte: end,
-        },
-      },
-      _count: true,
-    });
-
-    // Obrigados no período
-    const thanksInPeriod = await prisma.thank.count({
-      where: {
-        createdAt: {
-          gte: start,
-          lte: end,
-        },
-      },
-    });
-
-    // Candidaturas pendentes
-    const pendingApplications = await prisma.application.count({
-      where: { status: 'PENDING' },
-    });
-
-    // Top membros por indicações feitas
-    const topReferralGivers = await prisma.referral.groupBy({
-      by: ['giverId'],
-      _count: true,
-      orderBy: {
-        _count: {
-          giverId: 'desc',
-        },
-      },
-      take: 5,
-    });
-
-    const topGiversWithDetails = await Promise.all(
-      topReferralGivers.map(async (item) => {
-        const member = await prisma.member.findUnique({
-          where: { id: item.giverId },
-          select: { name: true, company: true },
-        });
-        return {
-          ...member,
-          totalReferrals: item._count,
-        };
-      })
-    );
+class DashboardService {
+  /**
+   * Obter estatísticas gerais do dashboard
+   */
+  async getStats(): Promise<DashboardStats> {
+    const [
+      totalMembers,
+      activeMembers,
+      inactiveMembers,
+      totalApplications,
+      pendingApplications,
+      approvedApplications,
+      rejectedApplications,
+      totalReferrals,
+      sentReferrals,
+      inNegotiationReferrals,
+      closedReferrals,
+      declinedReferrals,
+      totalThanks,
+    ] = await Promise.all([
+      prisma.member.count(),
+      prisma.member.count({ where: { status: 'ACTIVE' } }),
+      prisma.member.count({ where: { status: 'INACTIVE' } }),
+      prisma.application.count(),
+      prisma.application.count({ where: { status: 'PENDING' } }),
+      prisma.application.count({ where: { status: 'APPROVED' } }),
+      prisma.application.count({ where: { status: 'REJECTED' } }),
+      prisma.referral.count(),
+      prisma.referral.count({ where: { status: 'SENT' } }),
+      prisma.referral.count({ where: { status: 'IN_NEGOTIATION' } }),
+      prisma.referral.count({ where: { status: 'CLOSED' } }),
+      prisma.referral.count({ where: { status: 'DECLINED' } }),
+      prisma.thank.count(),
+    ]);
 
     return {
-      period: {
-        startDate: start,
-        endDate: end,
-        label: `${start.toLocaleDateString('pt-BR')} - ${end.toLocaleDateString('pt-BR')}`,
-      },
       members: {
         total: totalMembers,
-      },
-      referrals: {
-        total: referralsInPeriod,
-        byStatus: referralsByStatus.reduce(
-          (acc, item) => {
-            acc[item.status] = item._count;
-            return acc;
-          },
-          {} as Record<string, number>
-        ),
-      },
-      thanks: {
-        total: thanksInPeriod,
+        active: activeMembers,
+        inactive: inactiveMembers,
       },
       applications: {
+        total: totalApplications,
         pending: pendingApplications,
+        approved: approvedApplications,
+        rejected: rejectedApplications,
       },
-      topPerformers: topGiversWithDetails,
+      referrals: {
+        total: totalReferrals,
+        sent: sentReferrals,
+        inNegotiation: inNegotiationReferrals,
+        closed: closedReferrals,
+        declined: declinedReferrals,
+      },
+      thanks: {
+        total: totalThanks,
+      },
     };
-  },
-};
+  }
+
+  /**
+   * Top membros com mais indicações
+   */
+  async getTopReferrers(limit: number = 5) {
+    const members = await prisma.member.findMany({
+      where: { status: 'ACTIVE' },
+      include: {
+        _count: {
+          select: {
+            referralsMade: true,
+          },
+        },
+      },
+      orderBy: {
+        referralsMade: {
+          _count: 'desc',
+        },
+      },
+      take: limit,
+    });
+
+    return members.map(member => ({
+      id: member.id,
+      name: member.name,
+      company: member.company,
+      referralsCount: member._count.referralsMade,
+    }));
+  }
+}
+
+export const dashboardService = new DashboardService();

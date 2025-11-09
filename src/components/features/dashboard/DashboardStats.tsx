@@ -1,185 +1,310 @@
+// src/components/features/dashboard/DashboardStats.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, TrendingUp, MessageCircle, FileText } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-const ADMIN_TOKEN = process.env.NEXT_PUBLIC_ADMIN_TOKEN || 'admin_token';
-
-interface Stats {
-  period: {
-    startDate: string;
-    endDate: string;
-    label: string;
-  };
+interface DashboardData {
   members: {
     total: number;
+    active: number;
+    inactive: number;
+  };
+  applications: {
+    total: number;
+    pending: number;
+    approved: number;
+    rejected: number;
   };
   referrals: {
     total: number;
-    byStatus: Record<string, number>;
+    sent: number;
+    inNegotiation: number;
+    closed: number;
+    declined: number;
   };
   thanks: {
     total: number;
   };
-  applications: {
-    pending: number;
-  };
-  topPerformers: Array<{
+  topPerformers?: Array<{
+    id: string;
     name: string;
     company: string;
-    totalReferrals: number;
+    referralsCount: number;
   }>;
 }
 
 export function DashboardStats() {
-  const [stats, setStats] = useState<Stats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
   }, []);
 
   const fetchStats = async () => {
+    setIsLoading(true);
+    setError(null);
+
     try {
       const response = await fetch('/api/dashboard/stats', {
         headers: {
-          'X-Admin-Token': ADMIN_TOKEN,
+          'X-Admin-Token': process.env.NEXT_PUBLIC_ADMIN_TOKEN || 'admin_super_secret_token_change_me_in_production',
         },
       });
 
-      const result = await response.json();
-
-      if (result.success) {
-        setStats(result.data);
+      if (!response.ok) {
+        throw new Error('Erro ao carregar estatísticas');
       }
-    } catch (error) {
-      console.error('Erro ao carregar estatísticas:', error);
+
+      const result = await response.json();
+      setData(result.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao carregar estatísticas');
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  if (loading) {
-    return <div className="text-center py-8">Carregando estatísticas...</div>;
-  }
-
-  if (!stats) {
+  if (error) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        Erro ao carregar estatísticas
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4">
+        <p className="text-red-800">{error}</p>
       </div>
     );
   }
 
+  if (isLoading || !data) {
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-32 animate-pulse rounded-lg bg-gray-200" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const conversionRate = data.referrals.total > 0
+    ? ((data.referrals.closed / data.referrals.total) * 100).toFixed(1)
+    : '0.0';
+
+  const approvalRate = data.applications.total > 0
+    ? ((data.applications.approved / data.applications.total) * 100).toFixed(1)
+    : '0.0';
+
   return (
     <div className="space-y-6">
-      {/* Período */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <p className="text-sm font-medium text-blue-900">
-          📅 Período: {stats.period.label}
-        </p>
-      </div>
-
-      {/* Cards principais */}
+      {/* Main Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Membros Ativos */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Membros Ativos</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <svg
+              className="h-4 w-4 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+              />
+            </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.members.total}</div>
-            <p className="text-xs text-muted-foreground">Total de membros</p>
+            <div className="text-2xl font-bold">{data.members.active}</div>
+            <p className="text-xs text-muted-foreground">
+              {data.members.total} total ({data.members.inactive} inativos)
+            </p>
           </CardContent>
         </Card>
 
+        {/* Candidaturas Pendentes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Indicações</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Aguardando Revisão</CardTitle>
+            <svg
+              className="h-4 w-4 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.referrals.total}</div>
-            <p className="text-xs text-muted-foreground">No mês atual</p>
+            <div className="text-2xl font-bold">{data.applications.pending}</div>
+            <p className="text-xs text-muted-foreground">
+              {approvalRate}% aprovadas historicamente
+            </p>
           </CardContent>
         </Card>
 
+        {/* Indicações Totais */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Obrigados</CardTitle>
-            <MessageCircle className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Indicações Totais</CardTitle>
+            <svg
+              className="h-4 w-4 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+              />
+            </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.thanks.total}</div>
-            <p className="text-xs text-muted-foreground">No mês atual</p>
+            <div className="text-2xl font-bold">{data.referrals.total}</div>
+            <p className="text-xs text-muted-foreground">
+              {data.referrals.closed} fechadas ({conversionRate}%)
+            </p>
           </CardContent>
         </Card>
 
+        {/* Obrigados */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Candidaturas</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Agradecimentos</CardTitle>
+            <svg
+              className="h-4 w-4 text-muted-foreground"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.applications.pending}</div>
-            <p className="text-xs text-muted-foreground">Pendentes de análise</p>
+            <div className="text-2xl font-bold">{data.thanks.total}</div>
+            <p className="text-xs text-muted-foreground">
+              Negócios concluídos e agradecidos
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Indicações por status */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Indicações por Status</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {Object.entries(stats.referrals.byStatus).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between">
-                <span className="text-sm font-medium capitalize">
-                  {status === 'SENT' && '📤 Enviadas'}
-                  {status === 'IN_NEGOTIATION' && '🤝 Em Negociação'}
-                  {status === 'CLOSED' && '✅ Fechadas'}
-                  {status === 'DECLINED' && '❌ Recusadas'}
-                </span>
-                <span className="text-sm font-bold">{count}</span>
+      {/* Detailed Stats */}
+      <div className="grid gap-4 md:grid-cols-2">
+        {/* Indicações por Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Indicações por Status</CardTitle>
+            <CardDescription>Distribuição atual das indicações</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-blue-500" />
+                  <span className="text-sm">Enviadas</span>
+                </div>
+                <span className="text-sm font-medium">{data.referrals.sent}</span>
               </div>
-            ))}
-            {Object.keys(stats.referrals.byStatus).length === 0 && (
-              <p className="text-sm text-gray-500">Nenhuma indicação no período</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                  <span className="text-sm">Em Negociação</span>
+                </div>
+                <span className="text-sm font-medium">{data.referrals.inNegotiation}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-green-500" />
+                  <span className="text-sm">Fechadas</span>
+                </div>
+                <span className="text-sm font-medium">{data.referrals.closed}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-3 w-3 rounded-full bg-red-500" />
+                  <span className="text-sm">Recusadas</span>
+                </div>
+                <span className="text-sm font-medium">{data.referrals.declined}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
-      {/* Top performers */}
+        {/* Top Performers */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top 5 Membros</CardTitle>
+            <CardDescription>Membros com mais indicações</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {data.topPerformers && data.topPerformers.length > 0 ? (
+              <div className="space-y-3">
+                {data.topPerformers.map((member, index) => (
+                  <div key={member.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-bold text-indigo-600">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{member.name}</p>
+                        <p className="text-xs text-muted-foreground">{member.company}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-medium text-indigo-600">
+                      {member.referralsCount} indicações
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Nenhuma indicação registrada ainda
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Summary Stats */}
       <Card>
         <CardHeader>
-          <CardTitle>Top 5 - Membros com Mais Indicações</CardTitle>
+          <CardTitle>Resumo de Candidaturas</CardTitle>
+          <CardDescription>Status de todas as candidaturas recebidas</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {stats.topPerformers.map((performer, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between border-b pb-2 last:border-0"
-              >
-                <div>
-                  <p className="font-medium">{performer.name}</p>
-                  <p className="text-sm text-gray-500">{performer.company}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-lg font-bold text-blue-600">
-                    {performer.totalReferrals}
-                  </p>
-                  <p className="text-xs text-gray-500">indicações</p>
-                </div>
-              </div>
-            ))}
-            {stats.topPerformers.length === 0 && (
-              <p className="text-sm text-gray-500">Nenhuma indicação registrada</p>
-            )}
+          <div className="grid gap-4 md:grid-cols-4">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Total</p>
+              <p className="text-2xl font-bold">{data.applications.total}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Pendentes</p>
+              <p className="text-2xl font-bold text-yellow-600">{data.applications.pending}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Aprovadas</p>
+              <p className="text-2xl font-bold text-green-600">{data.applications.approved}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Rejeitadas</p>
+              <p className="text-2xl font-bold text-red-600">{data.applications.rejected}</p>
+            </div>
           </div>
         </CardContent>
       </Card>
